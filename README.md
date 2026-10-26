@@ -6,14 +6,14 @@
 <p><strong>高性能 · 多任务 · 端到端 GPU 的 TensorRT C++ 视觉推理框架</strong></p>
 
 <p>
-  <a href="#quick-start">快速开始</a> ·
-  <a href="#model-download">模型下载</a> ·
-  <a href="#supported-tasks">支持任务</a> ·
-  <a href="#panorama">任务全景</a> ·
-  <a href="#architecture">架构设计</a> ·
-  <a href="#environment">环境配置</a> ·
-  <a href="#tasks">任务文档</a> ·
-  <a href="#api">接口</a>
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#environment">Environment</a> ·
+  <a href="#whats-new">What's New</a> ·
+  <a href="#model-download">Model Downloads</a> ·
+  <a href="#supported-tasks">Tasks</a> ·
+  <a href="#gallery">Gallery</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#api">API</a>
 </p>
 
 <p>
@@ -51,91 +51,11 @@ make -j$(nproc)
 cd workspace && ./pro <task_name>
 ```
 
-部分任务会在首次运行时自动从 ONNX 构建 TensorRT engine，其余任务通过 `workspace/*_build.sh` 生成；完整的依赖版本、Makefile/CMake 配置与各任务模型导出步骤见 [环境配置](#environment) 和 [任务文档](#tasks)。
-
-<a id="model-download" name="model-download"></a>
-
-## 模型下载
-
-ONNX 测试模型包：[Baidu Drive](https://pan.baidu.com/s/1MbPYzUEkONsjCPOudiTt1A?pwd=onnx)（提取码 `onnx`）
-
-下载后放入 `workspace/`，执行 `./pro <task_name>`；如未找到所需模型，请按 [任务文档](#tasks) 自行导出。
-
-## Why this repo
-
-- **20+ 模型，一个可执行文件**：`workspace/pro` 通过任务名切换模型，无需为每个任务维护独立工程。
-- **全链路 GPU**：resize、normalize、decode、NMS、depth resize 均为 CUDA kernel，避免 CPU↔GPU 往返。
-- **TensorRT 8.x / 10.x 自适应**：通过 `NV_TENSORRT_MAJOR` 条件编译兼容两代 API，不依赖 protobuf。
-- **动态 Batch + 三种精度**：FP32 / FP16 / INT8，内置 Entropy 与 MinMax 校准器。
-- **模块化扩展**：新增任务只需实现 `preprocess()`、`worker()` 和后处理 kernel。
-
-<a id="supported-tasks" name="supported-tasks"></a>
-
-## 支持任务
-
-| 类别 | 已支持模型 |
-| :--- | :--- |
-| 检测 | YOLOv3 · YOLOv5 · YOLOv6 · YOLOv7 · YOLOv8 · YOLOv9 · YOLOv10 · YOLO11 · YOLOv12 · YOLOv13 · YOLO26 · RT-DETR · RF-DETR |
-| 分类 | YOLOv8-Cls · YOLO11-Cls · YOLO26-Cls |
-| 分割 | YOLOv8-Seg · YOLO11-Seg · YOLO26-Seg · YOLO26-Sem |
-| 姿态 | YOLOv8-Pose · YOLO11-Pose · YOLO26-Pose · RTMO |
-| 旋转框 | YOLOv8-OBB · YOLO11-OBB · YOLO26-OBB |
-| 深度 | Depth-Anything V1/V2 · **YOLO26-Depth** |
-| OCR | PP-OCRv4（det / cls / rec） |
-| 车道线 | LaneATT · CLRNet · CLRerNet |
-| 跟踪 | ByteTrack |
-| 自定义插件 | LayerNorm · DCNv2 · HSigmoid · HSwish · ScatterND |
-
-<a id="panorama" name="panorama"></a>
-
-## 任务全景
-
-<div align="center">
-  <img src="./assets/banner.jpg" width="100%" alt="tensorRT_Pro-Vision 任务全景">
-  <br>
-  <sub>检测 · 分类 · 分割 · 姿态 · OBB · 深度 · OCR · 车道线 · 跟踪</sub>
-</div>
-
-<a id="architecture" name="architecture"></a>
-
-## 架构设计
-
-所有任务共享同一套异步推理骨架，模型差异只体现在预处理与后处理：
-
-```text
-src/main.cpp                  CLI 任务分发
-src/application/app_*.cpp     每个任务的入口：编译/加载 engine、测试、可视化
-src/application/app_<task>/   模型专属实现
-    <task>.hpp                Infer 接口：commit / commits
-    <task>.cpp                继承 InferController：preprocess + worker
-    <task>_decode.cu          后处理 CUDA kernel
-src/tensorRT/
-    builder/                  TRT::compile：FP32 / FP16 / INT8
-    infer/                    TRT::load_infer：engine 加载与推理
-    common/                   Tensor、InferController、预处理 kernel、内存池
-```
-
-**新增一个任务只需要三步：**
-
-1. 在 `<task>.hpp` 中定义 `Infer` 接口；
-2. 在 `<task>.cpp` 中实现 `preprocess()` 与 `worker()`；
-3. 在 `<task>.cu` 中添加后处理 kernel，并在 `src/main.cpp` 注册任务。
-
-## ✨ What's New
-
-- **2026/10**：新增 **YOLO26-Depth** 单目米制深度估计，支持动态 batch、`align_corners` 后处理与 Spectral/metric 可视化。
-- **2026/6/26**：TensorRT 10.x 全面支持；移除 vendored ONNX parser 与 protobuf 依赖；修复 `getMaxBatchSize()` 警告；仓库更名为 **tensorRT_Pro-Vision**。
-
-<details>
-<summary>完整更新记录</summary>
-
-完整历史更新记录（2023–2026）请查看 [v1.0.0 README](https://github.com/Melody-Zhou/tensorRT_Pro-Vision/blob/v1.0.0/README.md)。
-
-</details>
+部分任务会在首次运行时自动从 ONNX 构建 TensorRT engine，其余任务通过 `workspace/*_build.sh` 生成；完整的依赖版本、Makefile/CMake 配置与各任务模型导出步骤见 [环境配置](#environment) 和 [任务文档](#supported-tasks)。
 
 <a id="environment" name="environment"></a>
 
-## 环境配置
+## Environment
 
 该项目依赖于 CUDA、cuDNN、TensorRT、OpenCV 库，请在 **Makefile** 或 **CMakeLists.txt** 中手动指定路径配置。
 
@@ -145,12 +65,6 @@ src/tensorRT/
 | cuDNN | >= 8.x | >= 9.x |
 | TensorRT | >= 8.4 | >= 10.0 |
 | OpenCV | >= 4.x | >= 4.x |
-
-**克隆项目：**
-
-```shell
-git clone https://github.com/Melody-Zhou/tensorRT_Pro-Vision.git
-```
 
 <details>
 <summary>Makefile 编译</summary>
@@ -195,11 +109,54 @@ cmake .. && make -j$(nproc)
 
 </details>
 
-<a id="tasks" name="tasks"></a>
+<a id="whats-new" name="whats-new"></a>
 
-## 各项任务支持
+## What's New
 
-按模型系列分组，点击系列标题展开；每个模型仍可单独折叠。
+- **2026/10**：新增 **YOLO26-Depth** 单目米制深度估计，支持动态 batch、`align_corners` 后处理与 Spectral/metric 可视化。
+- **2026/6/26**：TensorRT 10.x 全面支持；移除 vendored ONNX parser 与 protobuf 依赖；修复 `getMaxBatchSize()` 警告；仓库更名为 **tensorRT_Pro-Vision**。
+
+<details>
+<summary>完整更新记录</summary>
+
+完整历史更新记录（2023–2026）请查看 [v1.0.0 README](https://github.com/Melody-Zhou/tensorRT_Pro-Vision/blob/v1.0.0/README.md)。
+
+</details>
+
+<a id="model-download" name="model-download"></a>
+
+## Model Downloads
+
+ONNX 测试模型包：[Baidu Drive](https://pan.baidu.com/s/1MbPYzUEkONsjCPOudiTt1A?pwd=onnx)（提取码 `onnx`）
+
+下载后放入 `workspace/`，执行 `./pro <task_name>`；如未找到所需模型，请按 [任务文档](#supported-tasks) 自行导出。
+
+## Why this repo
+
+- **20+ 模型，一个可执行文件**：`workspace/pro` 通过任务名切换模型，无需为每个任务维护独立工程。
+- **全链路 GPU**：resize、normalize、decode、NMS、depth resize 均为 CUDA kernel，避免 CPU↔GPU 往返。
+- **TensorRT 8.x / 10.x 自适应**：通过 `NV_TENSORRT_MAJOR` 条件编译兼容两代 API，不依赖 protobuf。
+- **动态 Batch + 三种精度**：FP32 / FP16 / INT8，内置 Entropy 与 MinMax 校准器。
+- **模块化扩展**：新增任务只需实现 `preprocess()`、`worker()` 和后处理 kernel。
+
+<a id="supported-tasks" name="supported-tasks"></a>
+
+## Supported Tasks
+
+| 类别 | 已支持模型 |
+| :--- | :--- |
+| 检测 | YOLOv3 · YOLOv5 · YOLOv6 · YOLOv7 · YOLOv8 · YOLOv9 · YOLOv10 · YOLO11 · YOLOv12 · YOLOv13 · YOLO26 · RT-DETR · RF-DETR |
+| 分类 | YOLOv8-Cls · YOLO11-Cls · YOLO26-Cls |
+| 分割 | YOLOv8-Seg · YOLO11-Seg · YOLO26-Seg · YOLO26-Sem |
+| 姿态 | YOLOv8-Pose · YOLO11-Pose · YOLO26-Pose · RTMO |
+| 旋转框 | YOLOv8-OBB · YOLO11-OBB · YOLO26-OBB |
+| 深度 | Depth-Anything V1/V2 · **YOLO26-Depth** |
+| OCR | PP-OCRv4（det / cls / rec） |
+| 车道线 | LaneATT · CLRNet · CLRerNet |
+| 跟踪 | ByteTrack |
+| 自定义插件 | LayerNorm · DCNv2 · HSigmoid · HSwish · ScatterND |
+
+**任务文档**：按模型系列分组，点击系列标题展开；每个模型仍可单独折叠。
 
 [YOLO 经典](#docs-yolo-classic) · [YOLOv8](#docs-yolov8) · [YOLOv9–v11](#docs-yolo9-11) · [YOLOv12/v13](#docs-yolo12-13) · [YOLO26](#docs-yolo26) · [DETR](#docs-detr) · [深度估计](#docs-depth) · [OCR](#docs-ocr) · [车道线](#docs-lane) · [姿态与跟踪](#docs-pose-track) · [自定义插件](#docs-plugins)
 
@@ -3438,9 +3395,42 @@ ${TRTEXEC} \
 
 </details>
 
+<a id="gallery" name="gallery"></a>
+
+## Task Gallery
+
+<div align="center">
+  <img src="./assets/task_gallery.jpg" width="100%" alt="tensorRT_Pro-Vision 9 类任务推理示例">
+</div>
+
+<a id="architecture" name="architecture"></a>
+
+## Architecture
+
+所有任务共享同一套异步推理骨架，模型差异只体现在预处理与后处理：
+
+```text
+src/main.cpp                  CLI 任务分发
+src/application/app_*.cpp     每个任务的入口：编译/加载 engine、测试、可视化
+src/application/app_<task>/   模型专属实现
+    <task>.hpp                Infer 接口：commit / commits
+    <task>.cpp                继承 InferController：preprocess + worker
+    <task>_decode.cu          后处理 CUDA kernel
+src/tensorRT/
+    builder/                  TRT::compile：FP32 / FP16 / INT8
+    infer/                    TRT::load_infer：engine 加载与推理
+    common/                   Tensor、InferController、预处理 kernel、内存池
+```
+
+**新增一个任务只需要三步：**
+
+1. 在 `<task>.hpp` 中定义 `Infer` 接口；
+2. 在 `<task>.cpp` 中实现 `preprocess()` 与 `worker()`；
+3. 在 `<task>.cu` 中添加后处理 kernel，并在 `src/main.cpp` 注册任务。
+
 <a id="api" name="api"></a>
 
-## 接口介绍
+## API
 
 <details>
 <summary>编译接口</summary>
@@ -3485,7 +3475,7 @@ auto boxes = engine->commit(image).get()  // 得到的是 vector<Box>
 
 </details>
 
-## 参考
+## References
 
 - [https://github.com/shouxieai/tensorRT_Pro](https://github.com/shouxieai/tensorRT_Pro)
 - [https://github.com/shouxieai/infer](https://github.com/shouxieai/infer)

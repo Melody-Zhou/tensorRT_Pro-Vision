@@ -60,3 +60,6 @@
 /workspace/calib_data
 /workspace/*.cache
 /workspace/*.log
+
+# abandoned banner source folder
+/banner/
